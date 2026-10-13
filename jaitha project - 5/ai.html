@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#020617" />
+  <title>Scout AI — Secret Spots India</title>
+  <link rel="manifest" href="manifest.json" />
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>if (!Auth.getSession()) location.replace("login.html");</script>
+  <link rel="icon" href="icons/icon-192.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/ai.css" />
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans overflow-hidden">
+
+  <div class="ai-bg" aria-hidden="true"></div>
+
+  <div id="ai-shell" class="ai-shell">
+
+    <!-- SIDEBAR: chat history -->
+    <aside id="ai-sidebar" class="ai-sidebar glass">
+      <div class="flex items-center justify-between px-3 pt-3 pb-2">
+        <div class="flex items-center gap-2">
+          <div class="logo-mark">◎</div>
+          <span class="text-xs font-bold tracking-[0.18em] uppercase text-emerald-400">Scout AI</span>
+        </div>
+        <button id="close-sidebar" class="sm:hidden text-slate-400 hover:text-white px-2" aria-label="Close menu">✕</button>
+      </div>
+      <div class="px-3 pb-2">
+        <button id="new-chat" class="hud-btn hud-btn--primary w-full justify-center !py-2">＋ New chat</button>
+      </div>
+      <div class="lbl px-4 mt-1">History</div>
+      <div id="chat-list" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-2 pb-2 space-y-1"></div>
+      <div class="p-3 border-t border-slate-800 space-y-2">
+        <button id="open-settings" class="hud-btn w-full justify-center">⚙️ Model &amp; API key</button>
+        <a href="index.html" class="hud-btn w-full justify-center">🗺️ Back to map</a>
+      </div>
+    </aside>
+    <div id="sidebar-scrim" class="ai-scrim hidden"></div>
+
+    <!-- MAIN CHAT -->
+    <main class="ai-main">
+      <header class="ai-top glass">
+        <button id="open-sidebar" class="hud-btn sm:hidden" aria-label="Open menu">☰</button>
+        <a href="index.html" class="hud-btn" title="Back to the map">← <span class="hidden sm:inline">Map</span></a>
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-bold text-slate-100 leading-none truncate" id="chat-title">New chat</div>
+          <div id="engine-badge" class="text-[10px] text-slate-400 mt-1 truncate"></div>
+        </div>
+        <button id="ctx-toggle" class="hud-btn is-on" title="Let the AI see your location, saved spots and field log">📍 Context</button>
+        <button id="clear-chat" class="hud-btn" title="Delete this chat">🗑️</button>
+      </header>
+
+      <section id="messages" class="ai-messages custom-scrollbar" aria-live="polite">
+        <!-- welcome screen (removed once the chat has messages) -->
+        <div id="welcome" class="ai-welcome">
+          <div class="logo-mark !w-14 !h-14 !text-3xl !rounded-2xl mx-auto mb-3">◎</div>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-100">Ask the Scout anything</h2>
+          <p class="text-sm text-slate-400 mt-2 max-w-md mx-auto">Trip ideas, hidden spots, safety, packing, photography, history, even general questions. Your map, saved spots and field log are used as context when 📍 Context is on.</p>
+          <div id="suggestions" class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-6 max-w-2xl mx-auto"></div>
+        </div>
+      </section>
+
+      <!-- COMPOSER -->
+      <footer class="ai-composer-wrap">
+        <div class="ai-composer glass">
+          <textarea id="prompt" rows="1" maxlength="6000" placeholder="Message Scout AI…" class="ai-input custom-scrollbar" aria-label="Message"></textarea>
+          <div class="flex items-center gap-1.5">
+            <button id="mic-btn" class="hud-btn !p-2 hidden" title="Voice input">🎤</button>
+            <button id="send-btn" class="ai-send" title="Send" aria-label="Send">➤</button>
+          </div>
+        </div>
+        <p class="text-[10px] text-slate-500 text-center mt-1.5 px-2">AI can be wrong. Verify access, weather and safety before heading out. In an emergency in India call <b class="text-rose-300">112</b>.</p>
+      </footer>
+    </main>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass w-full sm:max-w-md max-h-[92vh] overflow-y-auto custom-scrollbar rounded-t-3xl sm:rounded-2xl p-5 space-y-3">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-emerald-400 tracking-widest uppercase text-sm">⚙️ AI Engine</h3>
+        <button id="close-settings" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+
+      <div>
+        <label class="lbl">Provider</label>
+        <div class="grid grid-cols-2 gap-1.5" id="provider-group">
+          <label class="kind-opt"><input type="radio" name="provider" value="local" /><span>🧭 Offline Scout<br><small class="opacity-70">No key needed</small></span></label>
+          <label class="kind-opt"><input type="radio" name="provider" value="anthropic" /><span>🟠 Claude<br><small class="opacity-70">Anthropic</small></span></label>
+          <label class="kind-opt"><input type="radio" name="provider" value="openai" /><span>🟢 ChatGPT<br><small class="opacity-70">OpenAI</small></span></label>
+          <label class="kind-opt"><input type="radio" name="provider" value="gemini" /><span>🔵 Gemini<br><small class="opacity-70">Google</small></span></label>
+        </div>
+      </div>
+
+      <div id="key-wrap" class="space-y-3">
+        <div>
+          <label class="lbl" for="api-key">API key</label>
+          <input id="api-key" type="password" autocomplete="off" spellcheck="false" class="fld" placeholder="Paste your key" />
+          <p id="key-help" class="text-[10px] text-slate-500 mt-1"></p>
+        </div>
+        <div>
+          <label class="lbl" for="model-name">Model</label>
+          <input id="model-name" list="model-list" class="fld" spellcheck="false" />
+          <datalist id="model-list"></datalist>
+          <p class="text-[10px] text-slate-500 mt-1">You can type any model name your key has access to.</p>
+        </div>
+      </div>
+
+      <div>
+        <label class="lbl" for="persona">Style</label>
+        <select id="persona" class="fld">
+          <option value="balanced">Balanced guide</option>
+          <option value="concise">Short &amp; direct</option>
+          <option value="detailed">Detailed planner</option>
+        </select>
+      </div>
+
+      <div class="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] text-amber-200/90 leading-snug">
+        <b>Privacy note:</b> this is a static app with no server, so your key is saved only in this browser and your messages go straight from your device to the provider you pick. Anyone using this browser profile could read the key, so use a restricted key and never put it on a shared device. With <b>Offline Scout</b> nothing leaves your device.
+      </div>
+
+      <div class="flex justify-between gap-2 pt-1">
+        <button id="forget-key" class="px-3 py-2 text-xs text-rose-300 hover:text-rose-200">Forget key</button>
+        <button id="save-settings" class="hud-btn hud-btn--primary px-5 py-2">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" style="bottom:90px"></div>
+
+  <script src="js/spots-data.js"></script>
+  <script src="js/algorithms.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/passport.js"></script>
+  <script src="js/ai.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>

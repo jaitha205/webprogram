@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#020617" />
+  <title>Secret Spots India — Exploration Recon</title>
+  <link rel="manifest" href="manifest.json" />
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script>if (!Auth.getSession()) location.replace("login.html");</script>
+  <link rel="icon" href="icons/icon-192.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="lib/leaflet/leaflet.css" />
+  <script src="lib/leaflet/leaflet.js"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans h-screen overflow-hidden relative">
+
+  <!-- FULL-SCREEN MAP -->
+  <div id="map" class="absolute inset-0 z-0"></div>
+  <div class="scanlines pointer-events-none absolute inset-0 z-[500]"></div>
+
+  <!-- TOP: RADAR CONTROL BAR -->
+  <header class="glass absolute top-2 left-2 right-2 sm:left-3 sm:right-3 z-[1100] rounded-2xl px-3 py-2 space-y-2">
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2 min-w-0">
+        <div class="logo-mark shrink-0">◎</div>
+        <div class="min-w-0">
+          <h1 class="text-sm font-bold tracking-[0.18em] uppercase text-emerald-400 leading-none truncate">Secret Spots</h1>
+          <p id="gps-status" class="text-[10px] text-slate-400 mt-1 flex items-center gap-1 truncate">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Acquiring GPS…
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <a id="ai-btn" href="ai.html" class="hud-btn hud-btn--primary" title="Ask Scout AI anything">✨ <span class="hidden sm:inline">Ask AI</span></a>
+        <button id="radar-toggle" class="hud-btn" title="Toggle radar rings">📡 <span class="hidden sm:inline">Radar</span></button>
+        <button id="track-btn" class="hud-btn" title="Trail tracker: record your path &amp; retrace it">👣</button>
+        <button id="add-log-btn" class="hud-btn hud-btn--primary" title="New field log entry">＋ <span class="hidden sm:inline">Log</span></button>
+        <button id="recenter-btn" class="hud-btn" title="Recenter on me">🎯</button>
+        <button id="sos-btn" class="hud-btn" title="Safety beacon">🆘</button>
+        <button id="profile-btn" class="hud-btn !pl-1" title="Scout profile &amp; passport">
+          <span id="avatar" class="avatar">?</span>
+          <span id="profile-xp" class="hidden sm:inline text-emerald-300">0 XP</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- FILTER CHIPS (floating, map visible between them) -->
+  <nav id="chips" class="absolute top-[4rem] left-2 right-2 sm:left-3 sm:right-3 z-[1100] flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+      <button data-filter="all" class="filter-chip chip active-chip">All</button>
+      <button data-filter="relax" class="filter-chip chip">🌿 Relax</button>
+      <button data-filter="romantic" class="filter-chip chip">✨ Romantic</button>
+      <button data-filter="adventure" class="filter-chip chip">⛰️ Adventure</button>
+      <button data-filter="bookmarked" class="filter-chip chip">⭐ Saved</button>
+      <button data-filter="log" class="filter-chip chip">📓 Field Log</button>
+      <button data-filter="discover" class="filter-chip chip">🔭 Discover</button>
+  </nav>
+
+  <!-- COMPASS & SCOUT RING -->
+  <button id="compass-widget" class="glass compass absolute right-2 sm:right-3 top-[6.6rem] z-[1050] rounded-2xl p-2 w-[76px] text-center" title="Tap to fly to the nearest spot and enable the phone compass">
+    <div class="compass-ring mx-auto">
+      <span class="compass-n">N</span>
+      <div id="compass-arrow" class="compass-arrow"></div>
+    </div>
+    <div id="compass-dist" class="text-[13px] font-bold text-emerald-400 mt-1 leading-none">--</div>
+    <div id="compass-bearing" class="text-[9px] text-slate-400 tracking-wider">-- </div>
+    <div id="compass-name" class="text-[9px] text-slate-300 truncate mt-0.5">Nearest spot</div>
+  </button>
+
+  <!-- ROUTE CARD (compact; tap the top line for details) -->
+  <section id="route-card" class="hidden glass absolute left-2 sm:left-3 top-[6.6rem] z-[1050] rounded-2xl px-3 py-2 w-[calc(100%-100px)] sm:w-80">
+    <div class="flex items-center justify-between gap-2">
+      <button id="route-toggle" class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider text-left">⚡ <span id="route-dist">--</span> · <span id="route-eta">--</span> ▾</button>
+      <button id="clear-route-btn" class="text-xs text-slate-400 hover:text-white">✕</button>
+    </div>
+    <div id="route-daylight" class="text-[11px] mt-1 space-y-0.5"></div>
+    <div id="route-details" class="hidden mt-2 max-h-[30vh] overflow-y-auto custom-scrollbar">
+      <div class="text-[10px] text-slate-500">A* nodes evaluated: <span id="route-nodes">--</span></div>
+      <div id="route-directions" class="text-[11px] text-slate-300 space-y-1 mt-1"></div>
+      <p class="text-[9px] text-slate-500 mt-2 leading-snug">Terrain-weighted straight-line estimate, not turn-by-turn. Times assume ~35 km/h by road and 2.4-4 km/h on foot.</p>
+      <a id="route-external" target="_blank" rel="noopener" class="inline-block mt-1 text-[10px] text-emerald-400 hover:underline">Open in a maps app ↗</a>
+    </div>
+  </section>
+
+  <!-- MAP TOOLS -->
+  <div id="map-tools" class="absolute right-2 sm:right-3 top-[13.8rem] z-[1050] flex flex-col gap-1.5">
+    <button id="style-btn" class="hud-btn !p-2" title="Map style: dark / standard / terrain / satellite">🗺️</button>
+    <button id="clean-btn" class="hud-btn !p-2" title="Clean map (hide all panels)">⛶</button>
+  </div>
+
+  <!-- BOTTOM: SPOT DRAWER -->
+  <section id="drawer" class="glass drawer absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-4xl z-[1100] rounded-t-3xl flex flex-col" data-state="open">
+    <button id="drawer-handle" class="w-full pt-2 pb-1 flex flex-col items-center shrink-0" aria-label="Toggle spot drawer">
+      <span class="w-10 h-1 rounded-full bg-slate-600"></span>
+    </button>
+    <div class="px-4 pb-2 flex items-center justify-between shrink-0">
+      <span class="text-[11px] tracking-[0.18em] uppercase text-slate-400">Nearby Intel · <span id="spot-count" class="text-emerald-400 font-bold">0</span></span>
+      <div class="flex items-center gap-3">
+        <button id="scan-btn" class="hidden text-[11px] text-teal-300 hover:underline">↻ Scan map centre</button>
+        <button id="drawer-toggle" class="text-[11px] text-emerald-400 hover:underline">Expand ▲</button>
+      </div>
+    </div>
+    <div id="spots-list" class="flex-1 min-h-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-3 overflow-x-auto snap-x custom-scrollbar"></div>
+  </section>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- TRAIL TRACKER HUD -->
+  <div id="tracker-hud" class="hidden glass absolute left-2 sm:left-3 z-[1050] rounded-2xl px-3 py-2" style="bottom:calc(var(--drawer-h) + 12px)">
+    <div class="flex items-center gap-3">
+      <span class="rec-dot"></span>
+      <div>
+        <div id="trk-dist" class="font-bold text-cyan-300 text-sm leading-none">0.00 km</div>
+        <div id="trk-meta" class="text-[10px] text-slate-400 mt-1">00:00 · 0.0 km/h</div>
+      </div>
+      <button id="trk-back" class="hud-btn">↩ Backtrack</button>
+      <button id="trk-stop" class="hud-btn !text-rose-300">■ Stop</button>
+    </div>
+  </div>
+
+  <!-- FIELD LOG MODAL -->
+  <div id="log-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass w-full sm:max-w-lg max-h-[92vh] overflow-y-auto custom-scrollbar rounded-t-3xl sm:rounded-2xl p-5">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3 mb-3">
+        <h3 class="font-bold text-emerald-400 tracking-widest uppercase text-sm">📓 Scout Field Log</h3>
+        <button id="close-log-btn" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <form id="log-form" class="space-y-3">
+        <div>
+          <label class="lbl">Pin Type</label>
+          <div class="grid grid-cols-3 gap-1.5" id="log-kind-group">
+            <label class="kind-opt"><input type="radio" name="log-kind" value="destination" checked /><span>🎯 Destination</span></label>
+            <label class="kind-opt"><input type="radio" name="log-kind" value="parking" /><span>🅿️ Parking</span></label>
+            <label class="kind-opt"><input type="radio" name="log-kind" value="entry" /><span>🚪 Entry Point</span></label>
+          </div>
+        </div>
+        <div>
+          <label class="lbl">Name</label>
+          <input id="log-name" required maxlength="80" class="fld" placeholder="e.g. Tamarind grove overlook" />
+        </div>
+        <div id="log-parent-wrap" class="hidden">
+          <label class="lbl">Belongs to destination (optional)</label>
+          <select id="log-parent" class="fld"></select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div data-dest-only>
+            <label class="lbl">Mood</label>
+            <select id="log-mood" class="fld">
+              <option value="relax">🌿 Relax</option>
+              <option value="romantic">✨ Romantic</option>
+              <option value="adventure">⛰️ Adventure</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl">Access Type</label>
+            <select id="log-access" class="fld"></select>
+          </div>
+          <div>
+            <label class="lbl">Terrain Difficulty</label>
+            <select id="log-terrain" class="fld">
+              <option value="1">1 · Stroll</option>
+              <option value="2">2 · Easy</option>
+              <option value="3" selected>3 · Moderate</option>
+              <option value="4">4 · Tough</option>
+              <option value="5">5 · Extreme</option>
+            </select>
+          </div>
+          <div data-dest-only>
+            <label class="lbl">Quiet Index</label>
+            <select id="log-quiet" class="fld">
+              <option value="85">🌿 Silent</option>
+              <option value="55" selected>👥 Moderate</option>
+              <option value="25">⚠️ Busy</option>
+            </select>
+          </div>
+        </div>
+        <div data-dest-only>
+          <label class="lbl">Best Visit Window</label>
+          <input id="log-window" maxlength="100" class="fld" placeholder="e.g. 6:00 AM sunrise, zero crowd" />
+        </div>
+        <div>
+          <label class="lbl">Caution Tags</label>
+          <div id="log-cautions" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <div>
+          <label class="lbl">Exact Coordinates</label>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="log-lat" type="number" step="any" min="-90" max="90" required placeholder="Latitude" class="fld" />
+            <input id="log-lng" type="number" step="any" min="-180" max="180" required placeholder="Longitude" class="fld" />
+          </div>
+          <div class="flex gap-2 mt-2">
+            <button type="button" id="log-use-gps" class="hud-btn flex-1 justify-center">📍 Use my GPS</button>
+            <button type="button" id="log-pick-map" class="hud-btn flex-1 justify-center">🗺️ Pick on map</button>
+          </div>
+        </div>
+        <div>
+          <label class="lbl">Private Notes</label>
+          <textarea id="log-notes" rows="3" maxlength="600" class="fld" placeholder="Gate code, landmark, snake warning, who to ask…"></textarea>
+        </div>
+        <p class="text-[10px] text-slate-500 italic">Stored only in this browser (LocalStorage). Nothing is uploaded.</p>
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" id="cancel-log-btn" class="px-4 py-2 text-xs text-slate-400 hover:text-white">Cancel</button>
+          <button type="submit" class="hud-btn hud-btn--primary px-5 py-2">Save to Log</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- PROFILE / PASSPORT MODAL -->
+  <div id="profile-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass w-full sm:max-w-lg max-h-[92vh] overflow-y-auto custom-scrollbar rounded-t-3xl sm:rounded-2xl p-5 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-emerald-400 tracking-widest uppercase text-sm">🏅 Scout Passport</h3>
+        <button id="close-profile-btn" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="pf-avatar" class="avatar avatar--lg">?</div>
+        <div class="min-w-0">
+          <div id="pf-name" class="font-bold text-slate-100 truncate"></div>
+          <div id="pf-meta" class="text-[11px] text-slate-400 truncate"></div>
+        </div>
+      </div>
+      <div>
+        <div class="flex justify-between items-baseline">
+          <span id="pf-rank" class="font-bold text-emerald-300"></span>
+          <span id="pf-xp" class="text-[11px] text-slate-400"></span>
+        </div>
+        <div class="xp-bar mt-1"><i id="pf-bar" style="width:0%"></i></div>
+        <p id="pf-next" class="text-[10px] text-slate-500 mt-1"></p>
+      </div>
+      <div>
+        <div class="lbl">Badges</div>
+        <div id="pf-badges" class="grid grid-cols-3 sm:grid-cols-4 gap-2"></div>
+      </div>
+      <div>
+        <div class="lbl">Location-verified stamps · <span id="pf-stamp-count">0</span></div>
+        <div id="pf-stamps" class="flex flex-wrap gap-1.5"></div>
+        <p class="text-[10px] text-slate-500 mt-1">Stamps are earned automatically when your GPS is within 250 m of a destination.</p>
+      </div>
+      <div>
+        <div class="lbl">Trail logs · <span id="pf-track-count">0</span></div>
+        <div id="pf-tracks" class="space-y-1.5"></div>
+        <p class="text-[10px] text-slate-500 mt-1">Tap 👣 on the map to record. Keep the screen on: browsers pause GPS in the background.</p>
+      </div>
+      <div class="border-t border-slate-800 pt-3">
+        <div class="lbl">Backup (no cloud, so keep a copy)</div>
+        <div class="flex gap-2">
+          <button id="export-btn" class="hud-btn flex-1 justify-center">⬇ Export JSON</button>
+          <label class="hud-btn flex-1 justify-center cursor-pointer">⬆ Import<input id="import-input" type="file" accept="application/json,.json" class="hidden" /></label>
+        </div>
+      </div>
+      <button id="logout-btn" class="hud-btn w-full justify-center !text-rose-300">Sign out</button>
+    </div>
+  </div>
+
+  <!-- SAFETY BEACON MODAL -->
+  <div id="sos-modal" class="hidden fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[2000] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="glass w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl p-5 space-y-3">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-rose-400 tracking-widest uppercase text-sm">🆘 Safety Beacon</h3>
+        <button id="close-sos-btn" class="text-slate-400 hover:text-white">✕</button>
+      </div>
+      <p class="text-[11px] text-slate-400">Builds a check-in message with your live coordinates so you can send it to someone before heading into a no-signal area, or when you need help.</p>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="lbl">Expected back by</label><input id="sos-return" type="time" class="fld" /></div>
+        <div><label class="lbl">Note</label><input id="sos-note" maxlength="80" class="fld" placeholder="e.g. Trekking, 2 people" /></div>
+      </div>
+      <pre id="sos-preview" class="text-[11px] whitespace-pre-wrap bg-slate-950/80 border border-slate-800 rounded-xl p-3 text-slate-300"></pre>
+      <div class="flex gap-2">
+        <button id="sos-share" class="hud-btn hud-btn--primary flex-1 justify-center">Share / Copy</button>
+        <a id="sos-wa" target="_blank" rel="noopener" class="hud-btn flex-1 justify-center">WhatsApp</a>
+      </div>
+      <p class="text-[10px] text-rose-300/80">In a real emergency in India call <b>112</b>. This app cannot contact rescuers and needs phone signal to send anything.</p>
+    </div>
+  </div>
+
+  <script src="js/spots-data.js"></script>
+  <script src="js/algorithms.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/passport.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.error('SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>

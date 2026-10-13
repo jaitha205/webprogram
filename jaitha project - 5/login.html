@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#020617" />
+  <title>Secret Spots India — Scout Sign-In</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/login.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen overflow-x-hidden">
+
+  <!-- Animated radar backdrop -->
+  <div class="radar-bg" aria-hidden="true">
+    <div class="r r1"></div><div class="r r2"></div><div class="r r3"></div><div class="r r4"></div>
+    <div class="cross-h"></div><div class="cross-v"></div>
+    <div class="sweep"></div>
+    <i class="blip" style="top:32%;left:62%"></i>
+    <i class="blip" style="top:58%;left:36%;animation-delay:1.2s"></i>
+    <i class="blip" style="top:44%;left:71%;animation-delay:2.4s"></i>
+    <i class="blip" style="top:70%;left:58%;animation-delay:3.1s"></i>
+  </div>
+  <div class="scanlines pointer-events-none fixed inset-0"></div>
+
+  <main class="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-8 gap-6">
+
+    <div class="text-center">
+      <div class="logo-mark mx-auto !w-14 !h-14 !text-3xl !rounded-2xl mb-3">◎</div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-[0.22em] uppercase text-emerald-400 glow">Secret Spots</h1>
+      <p class="text-sm text-slate-400 mt-2 max-w-xs mx-auto">Quiet, offbeat places across South India. Scout them. Log them. Disappear for a while.</p>
+    </div>
+
+    <section class="glass w-full max-w-sm rounded-3xl p-5">
+      <div class="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-900/80 border border-slate-800 mb-4">
+        <button id="tab-signin" class="auth-tab on">Sign In</button>
+        <button id="tab-signup" class="auth-tab">Create Account</button>
+      </div>
+
+      <!-- Google -->
+      <div id="g-host" class="flex justify-center min-h-[44px]"></div>
+      <button id="g-fallback" type="button" class="g-btn">
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 8 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+        Continue with Google
+      </button>
+
+      <div class="flex items-center gap-3 my-4 text-[10px] uppercase tracking-[0.2em] text-slate-500">
+        <span class="flex-1 h-px bg-slate-800"></span>or use email<span class="flex-1 h-px bg-slate-800"></span>
+      </div>
+
+      <form id="auth-form" class="space-y-3" novalidate>
+        <div id="name-wrap" class="hidden">
+          <label class="lbl" for="name">Scout Name</label>
+          <input id="name" class="fld" autocomplete="name" placeholder="Your name" maxlength="40" />
+        </div>
+        <div>
+          <label class="lbl" for="email">Email</label>
+          <input id="email" type="email" class="fld" autocomplete="email" placeholder="scout@secretspots.in" required />
+        </div>
+        <div>
+          <label class="lbl" for="password">Password</label>
+          <input id="password" type="password" class="fld" autocomplete="current-password" placeholder="At least 8 characters" required />
+        </div>
+        <button id="submit-btn" type="submit" class="hud-btn hud-btn--primary w-full justify-center py-2.5 text-sm">Sign In</button>
+      </form>
+
+      <button id="guest-btn" type="button" class="w-full mt-3 text-xs text-slate-400 hover:text-emerald-400 transition py-2">
+        Explore as guest →
+      </button>
+      <p id="msg" class="text-xs mt-1 text-center min-h-[1rem]"></p>
+    </section>
+
+    <section class="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full max-w-xl">
+      <div class="feat"><b>🌿 Solitude Meter</b><span>Quiet index &amp; best visit windows</span></div>
+      <div class="feat"><b>🥾 Terrain Intel</b><span>Dirt, footpath, 4x4 &amp; hazard tags</span></div>
+      <div class="feat"><b>📡 Radar Mode</b><span>5 / 15 / 30 km live range rings</span></div>
+      <div class="feat"><b>📓 Field Log</b><span>Private pins, parking &amp; entry points</span></div>
+      <div class="feat"><b>🏅 Scout Passport</b><span>XP, ranks &amp; location-verified stamps</span></div>
+      <div class="feat"><b>🆘 Safety Beacon</b><span>One-tap location check-in message</span></div>
+    </section>
+
+    <p class="text-[10px] text-slate-500 text-center max-w-sm">
+      Your log, saved spots and passport live on this device only. Email accounts are local to this browser; Google sign-in only shares your name, email and photo with this page.
+    </p>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/login.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  </script>
+</body>
+</html>
